@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Imóveis — Maximum Imóveis</title>
+    <link rel="icon" href="../assets/favicon.ico?v=2" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body class="admin-body">
+    <aside class="admin-sidebar">
+      <a class="admin-sidebar-brand" href="../index.html"><img src="../assets/logo trans.png" alt="Maximum Imóveis" /><span>ÁREA ADMINISTRATIVA</span></a>
+      <p class="admin-nav-label">Menu</p>
+      <nav aria-label="Navegação administrativa">
+        <a href="dashboard.html"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="8" height="7" rx="1"/></svg><span>Visão geral</span></a>
+        <a class="active" href="imoveis.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V8l7-4 7 4v12M9 20v-6h6v6M9 9h.01M15 9h.01"/></svg><span>Imóveis</span></a>
+        <a href="configuracoes.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 1.7Z"/></svg><span>Configurações</span></a>
+      </nav>
+      <div class="admin-sidebar-bottom"><span>Maximum Imóveis</span><a class="admin-logout" href="login.html"><span aria-hidden="true">↗</span>Sair</a></div>
+    </aside>
+    <main class="admin-main">
+      <header class="admin-page-header">
+        <div><p class="eyebrow">Gerenciamento</p><h1>Imóveis</h1><p>Cadastre e organize os apartamentos da Maximum.</p></div>
+        <button class="admin-primary" type="button" id="newProperty"><span aria-hidden="true">+</span>Novo imóvel</button>
+      </header>
+      <div class="admin-backend-note" id="adminNotice" role="status" hidden></div>
+      <section class="property-toolbar" aria-label="Buscar e filtrar imóveis">
+        <label>Buscar<input id="propertySearch" type="search" placeholder="Nome ou empreendimento"></label>
+        <label>Região<select id="regionFilter"><option value="">Todas as regiões</option><option>Zona Sul</option><option>Zona Oeste</option><option>Zona Leste</option><option>Zona Norte</option><option>Centro</option><option>Outra</option></select></label>
+        <label>Status<select id="statusFilter"><option value="">Todos os status</option><option value="publicado">Publicado</option><option value="rascunho">Rascunho</option></select></label>
+      </section>
+      <section id="propertyList" class="property-list" aria-live="polite"></section>
+    </main>
+    <dialog class="property-dialog" id="propertyDialog">
+      <form id="propertyForm">
+        <div class="admin-settings-heading"><div><p class="admin-section-kicker">Acervo Maximum</p><h2 id="propertyFormTitle">Novo apartamento</h2></div><button class="dialog-close" type="button" id="closePropertyDialog" aria-label="Fechar">×</button></div>
+        <div class="property-form-grid">
+          <label>Título<input name="titulo" maxlength="160" required></label>
+          <label>Slug<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*"></label>
+          <label>Nome do empreendimento<input name="nome_empreendimento" maxlength="160" required></label>
+          <label>Construtora<input name="construtora" maxlength="160" required></label>
+          <label>Padrão<select name="padrao" required><option value="">Selecione</option><option>Alto padrão</option><option>Altíssimo padrão</option></select></label>
+          <label>Região<select name="regiao" required><option value="">Selecione</option><option>Zona Sul</option><option>Zona Oeste</option><option>Zona Leste</option><option>Zona Norte</option><option>Centro</option><option>Outra</option></select></label>
+          <label>Bairro<input name="bairro" maxlength="120" required></label>
+          <label>Cidade<input name="cidade" maxlength="120" required></label>
+          <label>Estado (UF)<input name="estado" maxlength="2" minlength="2" value="SP" required></label>
+          <label>Endereço<input name="endereco"></label>
+          <label>Preço (R$)<input name="preco" type="number" min="0" step="0.01"></label>
+          <label>Área (m²)<input name="area_m2" type="number" min="0.01" step="0.01" required></label>
+          <label>Quartos<input name="quartos" type="number" min="1" step="1" required></label>
+          <label>Suítes<input name="suites" type="number" min="0" step="1" required></label>
+          <label>Banheiros<input name="banheiros" type="number" min="0" step="1" required></label>
+          <label>Vagas<input name="vagas" type="number" min="0" step="1" required></label>
+          <label>Data de entrega<input name="data_entrega" type="date"></label>
+          <label>Vídeo (URL)<input name="video_url" type="url"></label>
+          <label>Planta (URL)<input name="planta_url" type="url"></label>
+          <label class="property-description">Descrição<textarea name="descricao" rows="4"></textarea></label>
+          <label>Imagem de capa<input id="coverInput" type="file" accept="image/jpeg,image/png,image/webp,image/avif"><img id="coverPreview" class="upload-preview" alt="Pré-visualização da capa" hidden></label>
+          <label>Galeria de imagens<input id="galleryInput" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple><div id="galleryPreview" class="gallery-preview"></div></label>
+          <label class="property-checkbox"><input name="destaque" type="checkbox"> Imóvel em destaque</label>
+          <label>Status<select name="status" required><option value="rascunho">Rascunho</option><option value="publicado">Publicado</option></select></label>
+        </div>
+        <p class="upload-help">Imagens JPG, PNG, WebP ou AVIF de até 10 MB cada.</p>
+        <div class="dialog-actions"><button class="admin-secondary" type="button" id="cancelProperty">Cancelar</button><button class="admin-primary" id="saveProperty" type="submit">Salvar imóvel</button></div>
+      </form>
+    </dialog>
+    <script type="module" src="imoveis.js"></script>
+  </body>
+</html>
