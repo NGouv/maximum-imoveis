@@ -58,7 +58,7 @@ VITE_SUPABASE_URL=https://lwfegiadawykvbhuulgk.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key-do-projeto>
 ```
 
-Use somente a publishable key no frontend. Nunca use `service_role`, senha de banco ou secret key em variáveis `VITE_*`.
+Use `VITE_SUPABASE_PUBLISHABLE_KEY` como nome recomendado. `VITE_SUPABASE_ANON_KEY` também é aceito para compatibilidade com instalações existentes. Use somente uma chave pública (publishable ou anon) no frontend. Nunca use `service_role`, senha de banco ou secret key em variáveis `VITE_*`.
 
 ## 5. Executar e compilar
 

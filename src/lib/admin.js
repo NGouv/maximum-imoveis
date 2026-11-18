@@ -5,7 +5,7 @@ export async function requireAdmin() {
   if (!supabaseConfigured) {
     if (notice) {
       notice.hidden = false;
-      notice.textContent = "Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY para conectar o painel.";
+      notice.textContent = "Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY (ou VITE_SUPABASE_ANON_KEY) para conectar o painel.";
     }
     return false;
   }
