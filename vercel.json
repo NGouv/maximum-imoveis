@@ -1,0 +1,56 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/imovel.html",
+      "has": [
+        {
+          "type": "query",
+          "key": "id",
+          "value": "(?<id>[^/]+)"
+        }
+      ],
+      "destination": "/imovel/:id",
+      "permanent": true
+    },
+    {
+      "source": "/imovel.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/sobre.html",
+      "destination": "/sobre",
+      "permanent": true
+    },
+    {
+      "source": "/contato.html",
+      "destination": "/contato",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/imovel",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/imovel/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sobre",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/contato",
+      "destination": "/index.html"
+    }
+  ]
+}

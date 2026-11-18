@@ -6,6 +6,7 @@ const dialog = document.getElementById("propertyDialog");
 const galleryPreview = document.getElementById("galleryPreview");
 const coverPreview = document.getElementById("coverPreview");
 const saveButton = document.getElementById("saveProperty");
+const videoURLInput = form.elements.namedItem("video_url");
 let properties = [];
 let currentProperty = null;
 let galleryItems = [];
@@ -21,6 +22,25 @@ function notify(message) {
   const notice = document.getElementById("adminNotice");
   notice.hidden = false;
   notice.textContent = message;
+}
+
+function validateVideoURL() {
+  const value = videoURLInput.value.trim();
+  if (!value) {
+    videoURLInput.setCustomValidity("");
+    return true;
+  }
+  try {
+    const url = new URL(value);
+    const valid = ["http:", "https:"].includes(url.protocol) && url.hostname && !url.username && !url.password;
+    videoURLInput.setCustomValidity(valid
+      ? ""
+      : "Use um link HTTP ou HTTPS válido do YouTube, Instagram, TikTok ou de outro vídeo.");
+    return Boolean(valid);
+  } catch {
+    videoURLInput.setCustomValidity("Use um link HTTP ou HTTPS válido do YouTube, Instagram, TikTok ou de outro vídeo.");
+    return false;
+  }
 }
 
 function slugify(value) {
@@ -79,6 +99,7 @@ function setFormValue(name, value) {
 
 function resetForm() {
   form.reset();
+  validateVideoURL();
   currentProperty = null;
   galleryItems = [];
   coverPath = null;
@@ -167,7 +188,7 @@ function propertyPayload() {
     banheiros: Number(values.get("banheiros")),
     vagas: Number(values.get("vagas")),
     data_entrega: values.get("data_entrega") || null,
-    video_url: values.get("video_url") || null,
+    video_url: String(values.get("video_url") || "").trim() || null,
     planta_url: values.get("planta_url") || null,
     destaque: values.has("destaque"),
     status: values.get("status")
@@ -205,6 +226,7 @@ async function saveGallery(propertyId, uploadedPaths) {
 
 async function saveProperty(event) {
   event.preventDefault();
+  validateVideoURL();
   if (!form.reportValidity()) return;
   saveButton.disabled = true;
   const uploadedPaths = [];
@@ -350,6 +372,9 @@ galleryPreview.addEventListener("click", event => {
   if (button.dataset.galleryAction === "down" && index < galleryItems.length - 1) [galleryItems[index + 1], galleryItems[index]] = [galleryItems[index], galleryItems[index + 1]];
   renderGallery();
 });
+videoURLInput.addEventListener("input", validateVideoURL);
+videoURLInput.addEventListener("change", validateVideoURL);
+videoURLInput.addEventListener("invalid", validateVideoURL);
 form.elements.namedItem("titulo").addEventListener("input", event => {
   if (!currentProperty || !form.elements.namedItem("slug").dataset.edited) {
     setFormValue("slug", slugify(event.target.value));

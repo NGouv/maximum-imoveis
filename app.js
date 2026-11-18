@@ -1,4 +1,5 @@
 import { escapeHTML, getImageURL, supabase, supabaseConfigured } from "./src/lib/supabase.js";
+import defaultCompanyLogo from "./assets/logo trans.png";
 
 const catalogRows = document.getElementById("catalogRows");
 const catalogMessage = document.getElementById("catalogMessage");
@@ -92,33 +93,41 @@ async function cardTemplate(property) {
         <p class="card-location">${escapeHTML(propertyLocation(property))}</p>
         <div class="card-specs"><span>${formattedNumber(property.area_m2)} m²</span><span>${formattedQuantity(property.quartos, "quarto", "quartos")}</span><span>${formattedQuantity(property.suites, "suíte", "suítes")}</span><span>${formattedQuantity(property.vagas, "vaga", "vagas")}</span></div>
         <div class="card-price"><strong>${formattedPrice(property.preco)}</strong></div>
-        <a class="card-cta" href="#/imovel/${encodeURIComponent(property.slug)}" data-open-property="${slug}">Conhecer imóvel <span aria-hidden="true">→</span></a>
+        <a class="card-cta" href="/imovel/${encodeURIComponent(property.slug)}" data-open-property="${slug}">Conhecer imóvel <span aria-hidden="true">→</span></a>
       </div>
     </div>
   </article>`;
 }
 
 async function renderCatalog() {
-  const regions = [...new Set(properties.map(property => property.regiao))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const rows = [
-    { id: "selecao-maximum", title: "Seleção Maximum", kicker: "Imóveis em destaque", items: properties.filter(property => property.destaque) },
-    { id: "destaques-zona-sul", title: "Destaques da Zona Sul", kicker: "Zona Sul", items: properties.filter(property => property.destaque && property.regiao === "Zona Sul") },
-    { id: "destaques-zona-oeste", title: "Destaques da Zona Oeste", kicker: "Zona Oeste", items: properties.filter(property => property.destaque && property.regiao === "Zona Oeste") },
-    { id: "alto-padrao", title: "Coberturas e alto padrão", kicker: "Alto padrão", items: properties.filter(property => property.padrao === "Alto padrão" || isCoverage(property)) },
-    { id: "altissimo-padrao", title: "Altíssimo padrão", kicker: "Seleção especial", items: properties.filter(property => property.padrao === "Altíssimo padrão") },
-    ...regions.map(region => ({
-      id: `regiao-${region.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-      title: `Apartamentos na ${region}`,
-      kicker: "Por região",
-      items: properties.filter(property => property.regiao === region)
-    }))
+    {
+      id: "alto-padrao",
+      title: "Coberturas e alto padrão",
+      kicker: "Seleção por padrão",
+      items: properties.filter(property =>
+        property.categoria === "Apartamento" &&
+        (property.padrao === "Alto padrão" || isCoverage(property))
+      )
+    },
+    {
+      id: "altissimo-padrao",
+      title: "Altíssimo padrão",
+      kicker: "Seleção por padrão",
+      items: properties.filter(property =>
+        property.categoria === "Apartamento" &&
+        property.padrao === "Altíssimo padrão" &&
+        !isCoverage(property)
+      )
+    }
   ].filter(row => row.items.length);
 
   catalogRows.innerHTML = (await Promise.all(rows.map(async row => `<section class="property-row" id="${row.id}">
     <div class="row-heading"><div><p>${escapeHTML(row.kicker)}</p><h2>${escapeHTML(row.title)}</h2></div><div class="row-controls"><button type="button" data-scroll="-1" data-row="${row.id}" aria-label="Imóveis anteriores">‹</button><button type="button" data-scroll="1" data-row="${row.id}" aria-label="Próximos imóveis">›</button></div></div>
     <div class="carousel" id="carousel-${row.id}">${(await Promise.all(row.items.map(cardTemplate))).join("")}</div>
   </section>`))).join("");
-  catalogMessage.hidden = true;
+  catalogMessage.hidden = rows.length > 0;
+  if (!rows.length) catalogMessage.textContent = "Novos apartamentos selecionados serão apresentados em breve.";
   updateFavoriteCount();
   observeReveal();
 }
@@ -143,12 +152,9 @@ function applySettings(settings) {
   const instagram = institutionalSettings?.instagram || "";
   const email = institutionalSettings?.email || "";
   const name = institutionalSettings?.nome || "Maximum Imóveis";
-  if (institutionalSettings?.logotipo) {
-    document.querySelectorAll("[data-company-logo]").forEach(image => {
-      image.src = institutionalSettings.logotipo;
-      image.alt = name;
-    });
-  }
+  document.querySelectorAll("[data-company-logo]").forEach(image => {
+    setCompanyLogo(image, institutionalSettings?.logotipo, name);
+  });
   document.querySelectorAll("[data-company-name]").forEach(node => { node.textContent = name; });
   document.querySelectorAll("[data-contact-address]").forEach(node => { node.textContent = institutionalSettings?.endereco || ""; });
   document.title = `${name} | Seleção Exclusiva`;
@@ -179,6 +185,15 @@ function applySettings(settings) {
   } else {
     document.querySelectorAll("[data-contact-instagram]").forEach(link => { link.hidden = true; });
   }
+}
+
+function setCompanyLogo(image, source, name) {
+  image.alt = name;
+  image.onerror = () => {
+    image.onerror = null;
+    image.src = defaultCompanyLogo;
+  };
+  image.src = source || defaultCompanyLogo;
 }
 
 async function loadCatalog() {
@@ -228,34 +243,46 @@ function videoMarkup(value) {
   if (!value) return "";
   let url;
   try {
-    url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
+    url = new URL(value.trim());
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname) return "";
   } catch {
     return "";
   }
 
+  const hostname = url.hostname.toLowerCase();
+  const isHost = domain => hostname === domain || hostname.endsWith(`.${domain}`);
   let embedURL = "";
-  if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
-    const id = url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts)\/([\w-]{11})/)?.[1];
+  let platform = "a plataforma original";
+  if (isHost("youtube.com") || hostname === "youtu.be" || isHost("youtube-nocookie.com")) {
+    platform = "YouTube";
+    const id = url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]{11})(?:\/|$)/)?.[1];
     if (id && /^[\w-]{11}$/.test(id)) embedURL = `https://www.youtube-nocookie.com/embed/${id}`;
-  } else if (url.hostname === "youtu.be") {
-    const id = url.pathname.slice(1);
-    if (/^[\w-]{11}$/.test(id)) embedURL = `https://www.youtube-nocookie.com/embed/${id}`;
-  } else if (["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(url.hostname)) {
+    if (hostname === "youtu.be") {
+      const shortID = url.pathname.match(/^\/([\w-]{11})(?:\/|$)/)?.[1];
+      if (shortID) embedURL = `https://www.youtube-nocookie.com/embed/${shortID}`;
+    }
+  } else if (isHost("vimeo.com")) {
+    platform = "Vimeo";
     const id = url.pathname.match(/\/(?:video\/)?(\d+)/)?.[1];
     if (id) embedURL = `https://player.vimeo.com/video/${id}`;
-  } else if (["instagram.com", "www.instagram.com"].includes(url.hostname)) {
-    const match = url.pathname.match(/^\/(reel|p|tv)\/([\w-]+)/);
-    if (match) embedURL = `https://www.instagram.com/${match[1]}/${match[2]}/embed`;
+  } else if (isHost("instagram.com")) {
+    platform = "Instagram";
+    const match = url.pathname.match(/^\/(reel|p|tv)\/([\w-]+)(?:\/|$)/);
+    if (match) embedURL = `https://www.instagram.com/${match[1]}/${match[2]}/embed/`;
+  } else if (isHost("tiktok.com")) {
+    platform = "TikTok";
+    const id = url.pathname.match(/^\/@[^/]+\/video\/(\d+)(?:\/|$)/)?.[1]
+      || url.pathname.match(/^\/player\/v1\/(\d+)(?:\/|$)/)?.[1];
+    if (id) embedURL = `https://www.tiktok.com/player/v1/${id}?music_info=1&description=1`;
   }
 
   if (embedURL) {
-    return `<div class="video-frame"><iframe src="${escapeHTML(embedURL)}" title="Vídeo do empreendimento" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
+    return `<div class="video-frame"><iframe src="${escapeHTML(embedURL)}" title="Vídeo do empreendimento no ${escapeHTML(platform)}" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><a class="detail-resource video-external-link" href="${escapeHTML(url.href)}" target="_blank" rel="noopener">Abrir vídeo no ${escapeHTML(platform)} ↗</a>`;
   }
   if (/\.(mp4|webm|ogg)(?:$|[?#])/i.test(url.href)) {
-    return `<video class="property-video" controls preload="metadata"><source src="${escapeHTML(url.href)}"></video>`;
+    return `<video class="property-video" controls preload="metadata"><source src="${escapeHTML(url.href)}"></video><a class="detail-resource video-external-link" href="${escapeHTML(url.href)}" target="_blank" rel="noopener">Abrir vídeo externamente ↗</a>`;
   }
-  return `<a class="detail-resource" href="${escapeHTML(url.href)}" target="_blank" rel="noopener">Assistir ao vídeo do empreendimento ↗</a>`;
+  return `<a class="detail-resource" href="${escapeHTML(url.href)}" target="_blank" rel="noopener">Assistir ao vídeo em ${escapeHTML(platform)} ↗</a>`;
 }
 
 async function similarPropertyCards(property) {
@@ -291,7 +318,7 @@ async function showLightboxPhoto(index) {
 }
 
 async function openProperty(slug, updateHistory = true) {
-  const property = properties.find(item => item.slug === slug);
+  const property = properties.find(item => item.slug === slug || String(item.id) === String(slug));
   if (!property) return;
   const gallery = propertyGallery(property);
   activeGallery = gallery;
@@ -306,7 +333,6 @@ async function openProperty(slug, updateHistory = true) {
   const visiblePhotos = photos.filter(Boolean);
   const message = `Olá! Gostaria de agendar uma visita ao empreendimento ${property.nome_empreendimento}.`;
   const description = property.descricao?.trim();
-  const companyLogo = institutionalSettings?.logotipo || "assets/logo trans.png";
   const companyName = institutionalSettings?.nome || "Maximum Imóveis";
   const deliveryDate = property.data_entrega
     ? new Date(`${property.data_entrega}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -332,7 +358,7 @@ async function openProperty(slug, updateHistory = true) {
   const visitLink = contactHref(message);
   const favorite = favoriteButton(property).replace('class="favorite ', 'class="favorite detail-favorite ');
 
-  propertyDetail.innerHTML = `<div class="detail-head"><a href="#inicio" aria-label="${escapeHTML(companyName)}"><img src="${escapeHTML(companyLogo)}" alt="${escapeHTML(companyName)}" data-company-logo></a><button class="detail-close" type="button" aria-label="Fechar detalhes">×</button></div>
+  propertyDetail.innerHTML = `<div class="detail-head"><a href="/#inicio" aria-label="${escapeHTML(companyName)}"><img src="${defaultCompanyLogo}" alt="${escapeHTML(companyName)}" data-company-logo></a><button class="detail-close" type="button" aria-label="Fechar detalhes">×</button></div>
     <div class="detail-page">
       <header class="property-intro">
         <p class="detail-breadcrumb">Maximum Imóveis <span>/</span> ${escapeHTML(property.regiao)} <span>/</span> ${escapeHTML(property.bairro)}</p>
@@ -370,21 +396,22 @@ async function openProperty(slug, updateHistory = true) {
       <button class="lightbox-nav lightbox-next" type="button" data-lightbox-next aria-label="Próxima foto">›</button>
     </div>
     <p class="share-feedback" data-share-feedback aria-live="polite"></p>`;
+  setCompanyLogo(propertyDetail.querySelector("[data-company-logo]"), institutionalSettings?.logotipo, companyName);
   propertyDetail.dataset.slug = property.slug;
   propertyDetail.classList.add("open");
   propertyDetail.setAttribute("aria-hidden", "false");
   propertyDetail.scrollTop = 0;
   document.body.style.overflow = "hidden";
-  if (updateHistory) history.pushState({}, "", `#/imovel/${encodeURIComponent(property.slug)}`);
+  if (updateHistory) history.pushState({}, "", `/imovel/${encodeURIComponent(property.slug)}`);
   propertyDetail.querySelector(".detail-close").addEventListener("click", closeProperty);
 }
 
-function closeProperty() {
+function closeProperty(updateHistory = true) {
   closeLightbox();
   propertyDetail.classList.remove("open");
   propertyDetail.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
-  history.pushState({}, "", "#imoveis");
+  if (updateHistory) history.pushState({}, "", "/#imoveis");
 }
 
 async function openLightbox(index = 0) {
@@ -526,13 +553,44 @@ function observeReveal() {
 }
 
 async function routeDetail() {
-  const match = location.hash.match(/#\/imovel\/([^/]+)/);
-  if (match) await openProperty(decodeURIComponent(match[1]), false);
-  else if (propertyDetail.classList.contains("open")) closeProperty();
+  const path = location.pathname.replace(/\/+$/, "") || "/";
+  const pathMatch = path.match(/^\/imovel\/([^/]+)$/);
+  const legacyHashMatch = location.hash.match(/^#\/imovel\/([^/]+)/);
+  const legacyQueryPath = path === "/imovel" || path === "/imovel.html";
+  const decodeSegment = value => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  const identifier = pathMatch
+    ? decodeSegment(pathMatch[1])
+    : legacyHashMatch
+      ? decodeSegment(legacyHashMatch[1])
+      : legacyQueryPath
+        ? new URLSearchParams(location.search).get("id")
+        : null;
+  if (identifier) {
+    const property = properties.find(item => item.slug === identifier || String(item.id) === identifier);
+    if (property) {
+      const canonicalPath = `/imovel/${encodeURIComponent(property.slug)}`;
+      if (!pathMatch || location.pathname !== canonicalPath) history.replaceState({}, "", canonicalPath);
+      await openProperty(property.slug, false);
+      return;
+    }
+  }
+
+  if (propertyDetail.classList.contains("open")) closeProperty(false);
+  if (path === "/sobre" || path === "/contato") {
+    document.getElementById(path.slice(1))?.scrollIntoView({ block: "start" });
+  }
 }
 
 addEventListener("hashchange", routeDetail);
+addEventListener("popstate", routeDetail);
 observeReveal();
+routeDetail();
 loadCatalog().then(routeDetail).catch(error => {
   console.error("Erro ao inicializar o catálogo:", error);
   catalogMessage.hidden = false;
