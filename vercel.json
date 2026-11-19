@@ -3,6 +3,11 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/admin",
+      "destination": "/admin/login.html",
+      "permanent": true
+    },
+    {
       "source": "/imovel.html",
       "has": [
         {
