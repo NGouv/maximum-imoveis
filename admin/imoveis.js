@@ -16,6 +16,30 @@ const pdfPageGrid = document.getElementById("pdfPageGrid");
 const pdfImportStatus = document.getElementById("pdfImportStatus");
 const pdfAddSelectedButton = document.getElementById("pdfAddSelected");
 const pdfLoadMoreButton = document.getElementById("pdfLoadMore");
+const editablePropertyFields = [
+  "titulo",
+  "slug",
+  "nome_empreendimento",
+  "construtora",
+  "padrao",
+  "regiao",
+  "bairro",
+  "cidade",
+  "estado",
+  "endereco",
+  "preco",
+  "area_m2",
+  "quartos",
+  "suites",
+  "banheiros",
+  "vagas",
+  "data_entrega",
+  "video_url",
+  "planta_url",
+  "descricao",
+  "destaque",
+  "status"
+];
 let properties = [];
 let currentProperty = null;
 let currentPropertiesPage = 0;
@@ -282,9 +306,26 @@ function renderProperties() {
   loadPropertyThumbnails(list);
 }
 
-function setFormValue(name, value) {
+function getPropertyFormField(name) {
   const field = form.elements.namedItem(name);
-  if (field) field.value = value ?? "";
+  if (!field) throw new Error(`O campo "${name}" está ausente no formulário de imóveis.`);
+  return field;
+}
+
+function populatePropertyForm(property) {
+  const fields = Object.fromEntries(editablePropertyFields.map(name => [
+    name,
+    getPropertyFormField(name)
+  ]));
+  editablePropertyFields.forEach(name => {
+    const field = fields[name];
+    if (name === "destaque") field.checked = Boolean(property[name]);
+    else field.value = property[name] ?? "";
+  });
+}
+
+function setFormValue(name, value) {
+  getPropertyFormField(name).value = value ?? "";
 }
 
 async function resetForm() {
@@ -308,42 +349,43 @@ async function resetForm() {
 }
 
 async function editProperty(property) {
-  await resetForm();
-  notify("Carregando os dados atuais do imóvel...");
-  const { data: latest, error } = await supabase.from("imoveis")
-    .select("*, imagens_imoveis(id, url, ordem, created_at)")
-    .eq("id", property.id)
-    .single();
-  if (error) throw error;
+  try {
+    await resetForm();
+    notify("Carregando os dados atuais do imóvel...");
+    const { data: latest, error } = await supabase.from("imoveis")
+      .select("*, imagens_imoveis(id, url, ordem, created_at)")
+      .eq("id", property.id)
+      .single();
+    if (error) throw error;
 
-  currentProperty = latest;
-  coverPath = latest.imagem_capa ? getStoragePath(latest.imagem_capa) : null;
-  document.getElementById("coverActions").hidden = !coverPath;
-  coverFraming = normalizeCoverFraming(latest.enquadramento_capa);
-  for (const [name, value] of Object.entries(latest)) {
-    if (["id", "created_at", "updated_at", "imagem_capa", "enquadramento_capa", "imagens_imoveis"].includes(name)) continue;
-    if (name === "destaque") form.elements.namedItem(name).checked = value;
-    else setFormValue(name, value);
-  }
-  if (coverPath) {
-    try {
-      coverPreview.src = await getImageURL(latest.imagem_capa, {
-        width: 1000,
-        quality: 78,
-        resize: "contain"
-      });
-      coverPreview.hidden = false;
-    } catch (error) {
-      notify(`Não foi possível carregar a imagem de capa: ${error.message}`);
+    currentProperty = latest;
+    coverPath = latest.imagem_capa ? getStoragePath(latest.imagem_capa) : null;
+    document.getElementById("coverActions").hidden = !coverPath;
+    coverFraming = normalizeCoverFraming(latest.enquadramento_capa);
+    populatePropertyForm(latest);
+    if (coverPath) {
+      try {
+        coverPreview.src = await getImageURL(latest.imagem_capa, {
+          width: 1000,
+          quality: 78,
+          resize: "contain"
+        });
+        coverPreview.hidden = false;
+      } catch (error) {
+        notify(`Não foi possível carregar a imagem de capa: ${error.message}`);
+      }
     }
+    renderCoverFrames();
+    galleryItems = (latest.imagens_imoveis || [])
+      .sort((a, b) => a.ordem - b.ordem)
+      .map(image => ({ id: image.id, url: image.url, preview: "" }));
+    document.getElementById("propertyFormTitle").textContent = "Editar apartamento";
+    renderGallery();
+    dialog.showModal();
+  } catch (error) {
+    await resetForm();
+    notify(`Não foi possível abrir a edição do imóvel: ${error.message}`);
   }
-  renderCoverFrames();
-  galleryItems = (latest.imagens_imoveis || [])
-    .sort((a, b) => a.ordem - b.ordem)
-    .map(image => ({ id: image.id, url: image.url, preview: "" }));
-  document.getElementById("propertyFormTitle").textContent = "Editar apartamento";
-  renderGallery();
-  dialog.showModal();
 }
 
 function renderGallery() {
