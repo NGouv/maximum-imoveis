@@ -717,6 +717,10 @@ async function uploadImage(file, propertyId) {
 function propertyPayload() {
   const values = new FormData(form);
   const optionalText = name => String(values.get(name) || "").trim() || null;
+  const padrao = values.get("padrao");
+  if (padrao !== "Alto padrão" && padrao !== "Altíssimo padrão") {
+    throw new Error("Selecione um padrão válido para o imóvel.");
+  }
   return {
     titulo: String(values.get("titulo")).trim(),
     slug: slugify(String(values.get("slug"))),
@@ -724,7 +728,7 @@ function propertyPayload() {
     nome_empreendimento: optionalText("nome_empreendimento"),
     construtora: optionalText("construtora"),
     categoria: "Apartamento",
-    padrao: values.get("padrao"),
+    padrao,
     regiao: values.get("regiao"),
     bairro: String(values.get("bairro")).trim(),
     cidade: String(values.get("cidade")).trim(),
@@ -790,6 +794,13 @@ async function saveProperty(event) {
   }
   validateVideoURL();
   if (!form.reportValidity()) return;
+  let values;
+  try {
+    values = propertyPayload();
+  } catch (error) {
+    notify(`Não foi possível preparar o imóvel para salvar: ${error.message}`);
+    return;
+  }
   setSaveBusy(true);
   const saveButtonText = saveButton.textContent;
   saveButton.textContent = "Salvando...";
@@ -804,7 +815,6 @@ async function saveProperty(event) {
       newCover = await uploadImage(coverFile, propertyId);
       uploadedPaths.push(newCover);
     }
-    const values = propertyPayload();
     values.id = propertyId;
     const newCoverURL = newCover ? getStorageURL(newCover) : null;
     values.imagem_capa = newCoverURL;
