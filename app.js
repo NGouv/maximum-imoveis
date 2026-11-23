@@ -5,6 +5,7 @@ const catalogRows = document.getElementById("catalogRows");
 const catalogMessage = document.getElementById("catalogMessage");
 const propertyDetail = document.getElementById("propertyDetail");
 const imageURLs = new Map();
+const galleryCache = new Map();
 let properties = [];
 let institutionalSettings = null;
 let activeGallery = [];
@@ -24,28 +25,57 @@ function updateFavoriteCount() {
   if (count) count.textContent = getFavorites();
 }
 
-async function imageURL(path) {
+async function imageURL(path, transform = null) {
   if (!path) return "";
-  if (!imageURLs.has(path)) imageURLs.set(path, await getImageURL(path));
-  return imageURLs.get(path);
+  const cacheKey = `${path}:${transform ? JSON.stringify(transform) : "original"}`;
+  if (!imageURLs.has(cacheKey)) {
+    imageURLs.set(cacheKey, getImageURL(path, transform).catch(error => {
+      imageURLs.delete(cacheKey);
+      throw error;
+    }));
+  }
+  return imageURLs.get(cacheKey);
 }
 
 function formattedPrice(price) {
-  return price === null || price === undefined
+  return price === null || price === undefined || price === ""
     ? "Consulte valores"
     : Number(price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function formattedNumber(value) {
-  return Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  if (value === null || value === undefined || value === "") return "";
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "";
 }
 
 function formattedQuantity(value, singular, plural) {
+  if (value === null || value === undefined || value === "") return "";
   return `${formattedNumber(value)} ${Number(value) === 1 ? singular : plural}`;
 }
 
 function propertyLocation(property) {
-  return `${property.bairro} · ${property.regiao}, ${property.cidade}`;
+  return [property.bairro, property.regiao, property.cidade].filter(Boolean).join(" · ");
+}
+
+function coverPosition(property, view) {
+  const defaults = { x: 50, y: 50, zoom: 1 };
+  const frame = property.enquadramento_capa?.[view];
+  if (!frame) return defaults;
+  const clamp = (value, min, max, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+  };
+  return {
+    x: clamp(frame.x, 0, 100, defaults.x),
+    y: clamp(frame.y, 0, 100, defaults.y),
+    zoom: clamp(frame.zoom, 0.7, 2.5, defaults.zoom)
+  };
+}
+
+function coverStyle(property, view) {
+  const frame = coverPosition(property, view);
+  return `object-fit:${frame.zoom < 1 ? "contain" : "cover"};object-position:${frame.x}% ${frame.y}%;--cover-zoom:${frame.zoom};--cover-origin:${frame.x}% ${frame.y}%;--cover-hover-zoom:${(frame.zoom * 1.035).toFixed(3)}`;
 }
 
 function propertyGallery(property) {
@@ -67,36 +97,65 @@ function favoriteButton(property) {
   return `<button class="favorite ${active ? "active" : ""}" type="button" data-favorite="${escapeHTML(property.slug)}" aria-label="${active ? "Remover dos favoritos" : "Adicionar aos favoritos"}">${active ? "♥" : "♡"}</button>`;
 }
 
-async function cardTemplate(property) {
+function cardTemplate(property) {
   const cover = property.imagem_capa || property.imagens_imoveis?.[0]?.url;
-  let src = "";
-  if (cover) {
-    try {
-      src = await imageURL(cover);
-    } catch (error) {
-      console.error("Erro ao carregar imagem do imóvel:", error);
-    }
-  }
-  const image = src
-    ? `<img src="${src}" alt="${escapeHTML(property.nome_empreendimento)} — ${escapeHTML(property.bairro)}" loading="lazy">`
+  const propertyName = property.nome_empreendimento || property.titulo;
+  const image = cover
+    ? `<img data-storage-image="${escapeHTML(cover)}" alt="${escapeHTML(propertyName)} — ${escapeHTML(property.bairro)}" loading="lazy" decoding="async" style="${coverStyle(property, "card")}">`
     : '<div class="card-image-placeholder" aria-hidden="true"></div>';
   const slug = escapeHTML(property.slug);
-  const label = property.destaque ? "Seleção Maximum" : property.padrao;
-  return `<article class="property-card" data-slug="${escapeHTML(property.slug)}" tabindex="0" aria-label="Conhecer ${escapeHTML(property.nome_empreendimento)}">
+  const label = property.destaque ? "Seleção Maximum" : property.padrao || "Apartamento";
+  const specs = [
+    property.area_m2 !== null && property.area_m2 !== undefined && property.area_m2 !== "" && `${formattedNumber(property.area_m2)} m²`,
+    formattedQuantity(property.quartos, "quarto", "quartos"),
+    formattedQuantity(property.suites, "suíte", "suítes"),
+    formattedQuantity(property.vagas, "vaga", "vagas")
+  ].filter(Boolean);
+  return `<article class="property-card" data-slug="${escapeHTML(property.slug)}" tabindex="0" aria-label="Conhecer ${escapeHTML(propertyName)}">
     <div class="card-image">
       ${image}<div class="card-overlay"></div>
       <span class="tag">${escapeHTML(label)}</span>
       ${favoriteButton(property)}
       <div class="card-content">
-        <p class="card-standard">${escapeHTML(property.padrao)}</p>
-        <h3>${escapeHTML(property.nome_empreendimento)}</h3>
+        <p class="card-standard">${escapeHTML(property.padrao || "Apartamento")}</p>
+        <h3>${escapeHTML(propertyName)}</h3>
         <p class="card-location">${escapeHTML(propertyLocation(property))}</p>
-        <div class="card-specs"><span>${formattedNumber(property.area_m2)} m²</span><span>${formattedQuantity(property.quartos, "quarto", "quartos")}</span><span>${formattedQuantity(property.suites, "suíte", "suítes")}</span><span>${formattedQuantity(property.vagas, "vaga", "vagas")}</span></div>
+        ${specs.length ? `<div class="card-specs">${specs.map(spec => `<span>${escapeHTML(spec)}</span>`).join("")}</div>` : ""}
         <div class="card-price"><strong>${formattedPrice(property.preco)}</strong></div>
         <a class="card-cta" href="/imovel/${encodeURIComponent(property.slug)}" data-open-property="${slug}">Conhecer imóvel <span aria-hidden="true">→</span></a>
       </div>
     </div>
   </article>`;
+}
+
+function hydrateCatalogImages(container) {
+  const images = container.querySelectorAll("[data-storage-image]");
+  const loadImage = async image => {
+    try {
+      image.src = await imageURL(image.dataset.storageImage, { width: 760, quality: 78, resize: "contain" });
+      image.removeAttribute("data-storage-image");
+    } catch (error) {
+      console.error("Erro ao carregar imagem do imóvel:", error);
+      const placeholder = document.createElement("div");
+      placeholder.className = "card-image-placeholder";
+      placeholder.setAttribute("aria-hidden", "true");
+      image.replaceWith(placeholder);
+      catalogMessage.hidden = false;
+      catalogMessage.textContent = "Algumas imagens não puderam ser carregadas. Confira as permissões e o limite do Storage no Supabase.";
+    }
+  };
+  if (!("IntersectionObserver" in window)) {
+    images.forEach(image => { loadImage(image); });
+    return;
+  }
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      observer.unobserve(entry.target);
+      loadImage(entry.target);
+    });
+  }, { rootMargin: "220px" });
+  images.forEach(image => observer.observe(image));
 }
 
 async function renderCatalog() {
@@ -128,6 +187,7 @@ async function renderCatalog() {
   </section>`))).join("");
   catalogMessage.hidden = rows.length > 0;
   if (!rows.length) catalogMessage.textContent = "Novos apartamentos selecionados serão apresentados em breve.";
+  hydrateCatalogImages(catalogRows);
   updateFavoriteCount();
   observeReveal();
 }
@@ -202,7 +262,12 @@ async function loadCatalog() {
     return;
   }
   const [{ data, error }, { data: settings, error: settingsError }] = await Promise.all([
-    supabase.from("imoveis").select("*, imagens_imoveis(id, url, ordem)").eq("status", "publicado").order("created_at", { ascending: false }),
+    supabase.from("imoveis")
+      .select("id, titulo, slug, nome_empreendimento, descricao, regiao, bairro, cidade, estado, area_m2, quartos, suites, banheiros, vagas, preco, padrao, categoria, destaque, imagem_capa, enquadramento_capa, construtora, endereco, data_entrega, video_url, planta_url, status, imagens_imoveis(url, ordem)")
+      .eq("status", "publicado")
+      .order("created_at", { ascending: false })
+      .order("ordem", { ascending: true, referencedTable: "imagens_imoveis" })
+      .limit(1, { referencedTable: "imagens_imoveis" }),
     supabase.from("configuracoes").select("*").eq("id", 1).maybeSingle()
   ]);
   if (error) {
@@ -211,10 +276,7 @@ async function loadCatalog() {
   }
   if (settingsError) console.error("Erro ao carregar as configurações institucionais:", settingsError);
   applySettings(settings);
-  properties = (data || []).map(property => ({
-    ...property,
-    imagens_imoveis: (property.imagens_imoveis || []).sort((a, b) => a.ordem - b.ordem)
-  }));
+  properties = data || [];
   if (!properties.length) {
     catalogMessage.textContent = "Novos apartamentos selecionados serão apresentados em breve.";
     return;
@@ -229,6 +291,7 @@ async function loadCatalog() {
 }
 
 function detailSpec(icon, value, label) {
+  if (value === null || value === undefined || value === "") return "";
   const icons = {
     area: '<path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M8 12h8"/>',
     rooms: '<path d="M3 19v-8h18v8M3 15h18M6 11V7a2 2 0 0 1 2-2h3v6M13 11V8a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3"/>',
@@ -308,7 +371,7 @@ async function showLightboxPhoto(index) {
   if (!lightbox || !image || !counter) return;
   counter.textContent = `${lightboxIndex + 1} / ${activeGallery.length}`;
   try {
-    image.src = await imageURL(activeGallery[lightboxIndex]);
+    image.src = await imageURL(activeGallery[lightboxIndex], { width: 2000, quality: 85, resize: "contain" });
     image.alt = `Imagem ${lightboxIndex + 1} de ${activeGallery.length} do empreendimento`;
   } catch (error) {
     console.error("Erro ao carregar imagem da galeria:", error);
@@ -318,20 +381,36 @@ async function showLightboxPhoto(index) {
 }
 
 async function openProperty(slug, updateHistory = true) {
-  const property = properties.find(item => item.slug === slug || String(item.id) === String(slug));
+  let property = properties.find(item => item.slug === slug || String(item.id) === String(slug));
   if (!property) return;
+  if (!galleryCache.has(property.id)) {
+    const { data: gallery, error: galleryError } = await supabase.from("imagens_imoveis")
+      .select("url, ordem")
+      .eq("imovel_id", property.id)
+      .order("ordem", { ascending: true });
+    if (galleryError) {
+      console.error("Erro ao carregar a galeria do imóvel:", galleryError);
+      catalogMessage.hidden = false;
+      catalogMessage.textContent = `Não foi possível carregar a galeria: ${galleryError.message}`;
+      galleryCache.set(property.id, []);
+    } else {
+      galleryCache.set(property.id, gallery || []);
+    }
+  }
+  property = { ...property, imagens_imoveis: galleryCache.get(property.id) };
   const gallery = propertyGallery(property);
   activeGallery = gallery;
+  const propertyName = property.nome_empreendimento || property.titulo;
   const photos = await Promise.all(gallery.slice(0, 5).map(async (path, index) => {
     try {
-      return { index, src: await imageURL(path) };
+      return { index, path, src: await imageURL(path, { width: 1600, quality: 82, resize: "contain" }) };
     } catch (error) {
       console.error("Erro ao carregar imagem da galeria:", error);
       return null;
     }
   }));
   const visiblePhotos = photos.filter(Boolean);
-  const message = `Olá! Gostaria de agendar uma visita ao empreendimento ${property.nome_empreendimento}.`;
+  const message = `Olá! Gostaria de agendar uma visita ao imóvel ${propertyName}.`;
   const description = property.descricao?.trim();
   const companyName = institutionalSettings?.nome || "Maximum Imóveis";
   const deliveryDate = property.data_entrega
@@ -339,7 +418,7 @@ async function openProperty(slug, updateHistory = true) {
     : "";
   const galleryMarkup = visiblePhotos.length
     ? `<section class="detail-gallery-section" aria-label="Galeria do empreendimento">
-        <div class="gallery-mosaic gallery-count-${visiblePhotos.length}">${visiblePhotos.map((photo, position) => `<button class="gallery-photo ${position === 0 ? "gallery-photo-main" : ""}" type="button" data-lightbox-index="${photo.index}" aria-label="Abrir foto ${photo.index + 1} de ${gallery.length}"><img src="${photo.src}" alt="${escapeHTML(property.nome_empreendimento)} — foto ${photo.index + 1}" ${position > 1 ? 'loading="lazy"' : ""}></button>`).join("")}</div>
+        <div class="gallery-mosaic gallery-count-${visiblePhotos.length}">${visiblePhotos.map((photo, position) => `<button class="gallery-photo ${position === 0 ? "gallery-photo-main" : ""}" type="button" data-lightbox-index="${photo.index}" aria-label="Abrir foto ${photo.index + 1} de ${gallery.length}"><img src="${escapeHTML(photo.src)}" alt="${escapeHTML(propertyName)} — foto ${photo.index + 1}" ${photo.path === property.imagem_capa ? `style="${coverStyle(property, "detail")}"` : ""} ${position > 1 ? 'loading="lazy"' : ""} decoding="async"></button>`).join("")}</div>
         <button class="all-photos-button" type="button" data-open-lightbox>Ver todas as fotos <span>${gallery.length}</span></button>
       </section>`
     : "";
@@ -363,7 +442,7 @@ async function openProperty(slug, updateHistory = true) {
       <header class="property-intro">
         <p class="detail-breadcrumb">Maximum Imóveis <span>/</span> ${escapeHTML(property.regiao)} <span>/</span> ${escapeHTML(property.bairro)}</p>
         <div class="property-intro-main">
-          <div><span class="property-standard">${escapeHTML(property.padrao)}</span><h1>${escapeHTML(property.nome_empreendimento)}</h1><p class="property-title">${escapeHTML(property.titulo)}</p><p class="property-location">${escapeHTML(propertyLocation(property))}</p></div>
+          <div><span class="property-standard">${escapeHTML(property.padrao || "Apartamento")}</span><h1>${escapeHTML(propertyName)}</h1><p class="property-title">${escapeHTML(property.titulo)}</p><p class="property-location">${escapeHTML(propertyLocation(property))}</p></div>
           <div class="detail-actions">${favorite}<button class="share-button" type="button" data-share-property>Compartilhar</button></div>
         </div>
       </header>
@@ -373,7 +452,7 @@ async function openProperty(slug, updateHistory = true) {
           ${description ? `<section class="detail-section"><p class="eyebrow">O projeto</p><h2>Sobre o empreendimento</h2><p class="detail-description">${escapeHTML(description)}</p></section>` : ""}
           <section class="detail-section">
             <p class="eyebrow">Informações do imóvel</p><h2>Especificações</h2>
-            <div class="detail-specs">${detailSpec("area", `${formattedNumber(property.area_m2)} m²`, "Área privativa")}${detailSpec("rooms", formattedNumber(property.quartos), Number(property.quartos) === 1 ? "Quarto" : "Quartos")}${detailSpec("suites", formattedNumber(property.suites), "Suítes")}${detailSpec("baths", formattedNumber(property.banheiros), "Banheiros")}${detailSpec("parking", formattedNumber(property.vagas), "Vagas")}</div>
+            <div class="detail-specs">${detailSpec("area", property.area_m2 === null || property.area_m2 === undefined ? "" : `${formattedNumber(property.area_m2)} m²`, "Área privativa")}${detailSpec("rooms", formattedNumber(property.quartos), Number(property.quartos) === 1 ? "Quarto" : "Quartos")}${detailSpec("suites", formattedNumber(property.suites), "Suítes")}${detailSpec("baths", formattedNumber(property.banheiros), "Banheiros")}${detailSpec("parking", formattedNumber(property.vagas), "Vagas")}</div>
           </section>
           ${differentiators.length ? `<section class="detail-section"><p class="eyebrow">Dados cadastrados</p><h2>Diferenciais da unidade</h2><div class="differentiator-grid">${differentiators.join("")}</div></section>` : ""}
           ${video || plan ? `<section class="detail-section"><p class="eyebrow">Materiais do empreendimento</p><h2>Vídeo e planta</h2>${video}${plan}</section>` : ""}
@@ -381,7 +460,7 @@ async function openProperty(slug, updateHistory = true) {
         <aside class="detail-aside">
           <p class="eyebrow">Atendimento Maximum</p><h2>${formattedPrice(property.preco)}</h2>
           <p class="aside-location">${escapeHTML(property.bairro)} · ${escapeHTML(property.regiao)}</p>
-          <div class="aside-specs"><span>${formattedNumber(property.area_m2)} m²</span><span>${formattedQuantity(property.quartos, "quarto", "quartos")}</span><span>${formattedQuantity(property.suites, "suíte", "suítes")}</span></div>
+          <div class="aside-specs">${property.area_m2 !== null && property.area_m2 !== undefined && property.area_m2 !== "" ? `<span>${formattedNumber(property.area_m2)} m²</span>` : ""}${property.quartos !== null && property.quartos !== undefined ? `<span>${formattedQuantity(property.quartos, "quarto", "quartos")}</span>` : ""}${property.suites !== null && property.suites !== undefined ? `<span>${formattedQuantity(property.suites, "suíte", "suítes")}</span>` : ""}</div>
           <a class="button button-gold" href="${escapeHTML(visitLink)}" ${whatsappAvailable ? 'target="_blank" rel="noopener"' : ""}>Agendar visita</a>
           ${institutionalSettings?.telefone ? `<a class="aside-phone" href="tel:${escapeHTML(institutionalSettings.telefone.replace(/[^\d+]/g, ""))}">${escapeHTML(institutionalSettings.telefone)}</a>` : ""}
           <p class="simulation-note">Valores e disponibilidade devem ser confirmados com a Maximum Imóveis.</p>
@@ -396,6 +475,7 @@ async function openProperty(slug, updateHistory = true) {
       <button class="lightbox-nav lightbox-next" type="button" data-lightbox-next aria-label="Próxima foto">›</button>
     </div>
     <p class="share-feedback" data-share-feedback aria-live="polite"></p>`;
+  hydrateCatalogImages(propertyDetail);
   setCompanyLogo(propertyDetail.querySelector("[data-company-logo]"), institutionalSettings?.logotipo, companyName);
   propertyDetail.dataset.slug = property.slug;
   propertyDetail.classList.add("open");
@@ -487,7 +567,7 @@ document.addEventListener("click", event => {
     const property = properties.find(item => item.slug === propertyDetail.dataset.slug);
     const url = location.href;
     if (navigator.share && property) {
-      navigator.share({ title: property.nome_empreendimento, text: property.titulo, url })
+      navigator.share({ title: property.nome_empreendimento || property.titulo, text: property.titulo, url })
         .catch(error => {
           if (error.name !== "AbortError" && feedback) feedback.textContent = "Não foi possível compartilhar este imóvel.";
         });

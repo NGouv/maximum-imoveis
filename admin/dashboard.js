@@ -22,7 +22,7 @@ async function loadDashboard() {
   const list = document.getElementById("recentProperties");
   list.innerHTML = recent.length
     ? recent.map(property => `<article class="admin-recent-item">
-        <div><h3>${escapeHTML(property.nome_empreendimento)}</h3><p>${escapeHTML(property.bairro)} · ${escapeHTML(property.regiao)} · ${property.status === "publicado" ? "Publicado" : "Rascunho"}</p></div>
+        <div><h3>${escapeHTML(property.nome_empreendimento || property.titulo)}</h3><p>${escapeHTML([property.bairro, property.regiao].filter(Boolean).join(" · "))} · ${property.status === "publicado" ? "Publicado" : "Rascunho"}</p></div>
         <time datetime="${escapeHTML(property.created_at)}">${new Date(property.created_at).toLocaleDateString("pt-BR")}</time>
       </article>`).join("")
     : '<p class="admin-empty-message">Nenhum imóvel cadastrado.</p>';

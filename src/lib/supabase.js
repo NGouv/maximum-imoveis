@@ -25,6 +25,7 @@ const storageURLPrefix = supabaseConfigured
   ? `${VITE_SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/authenticated/imoveis/`
   : "";
 const storagePathPrefix = "/storage/v1/object/authenticated/imoveis/";
+const signedImageURLs = new Map();
 
 export function escapeHTML(value = "") {
   return String(value).replace(/[&<>"']/g, character => ({
@@ -51,10 +52,34 @@ export function getStorageURL(path) {
   return `${storageURLPrefix}${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-export async function getImageURL(value) {
+export async function getImageURL(value, transform = null) {
   if (!value || !supabase) return "";
   const path = getStoragePath(value);
-  const { data, error } = await supabase.storage.from("imoveis").download(path);
-  if (error) throw error;
-  return URL.createObjectURL(data);
+  const cacheKey = `${path}:${transform ? JSON.stringify(transform) : "original"}`;
+  const cached = signedImageURLs.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise || cached.url;
+
+  const expiresIn = 60 * 60;
+  const request = (async () => {
+    const bucket = supabase.storage.from("imoveis");
+    let result = await bucket.createSignedUrl(path, expiresIn, transform ? { transform } : undefined);
+    if (result.error && transform) {
+      console.warn("A transformação de imagem do Storage falhou; usando a imagem original:", result.error);
+      result = await bucket.createSignedUrl(path, expiresIn);
+    }
+    if (result.error) throw result.error;
+    return result.data.signedUrl;
+  })();
+  const cacheEntry = { promise: request, expiresAt: Number.POSITIVE_INFINITY };
+  signedImageURLs.set(cacheKey, cacheEntry);
+  try {
+    const url = await request;
+    cacheEntry.url = url;
+    cacheEntry.promise = null;
+    cacheEntry.expiresAt = Date.now() + (expiresIn - 60) * 1000;
+    return url;
+  } catch (error) {
+    signedImageURLs.delete(cacheKey);
+    throw error;
+  }
 }

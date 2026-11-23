@@ -34,6 +34,11 @@
         <label>Status<select id="statusFilter"><option value="">Todos os status</option><option value="publicado">Publicado</option><option value="rascunho">Rascunho</option></select></label>
       </section>
       <section id="propertyList" class="property-list" aria-live="polite"></section>
+      <nav class="property-pagination" aria-label="Paginação de imóveis">
+        <button class="admin-secondary" id="propertiesPrevious" type="button" disabled>Anterior</button>
+        <span id="propertiesPage" aria-live="polite">Página 1</span>
+        <button class="admin-secondary" id="propertiesNext" type="button" disabled>Próxima</button>
+      </nav>
     </main>
     <dialog class="property-dialog" id="propertyDialog">
       <form id="propertyForm">
@@ -41,8 +46,8 @@
         <div class="property-form-grid">
           <label>Título<input name="titulo" maxlength="160" required></label>
           <label>Slug<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*"></label>
-          <label>Nome do empreendimento<input name="nome_empreendimento" maxlength="160" required></label>
-          <label>Construtora<input name="construtora" maxlength="160" required></label>
+          <label>Nome do empreendimento<input name="nome_empreendimento" maxlength="160"></label>
+          <label>Construtora<input name="construtora" maxlength="160"></label>
           <label>Padrão<select name="padrao" required><option value="">Selecione</option><option>Alto padrão</option><option>Altíssimo padrão</option></select></label>
           <label>Região<select name="regiao" required><option value="">Selecione</option><option>Zona Sul</option><option>Zona Oeste</option><option>Zona Leste</option><option>Zona Norte</option><option>Centro</option><option>Outra</option></select></label>
           <label>Bairro<input name="bairro" maxlength="120" required></label>
@@ -51,16 +56,42 @@
           <label>Endereço<input name="endereco"></label>
           <label>Preço (R$)<input name="preco" type="number" min="0" step="0.01"></label>
           <label>Área (m²)<input name="area_m2" type="number" min="0.01" step="0.01" required></label>
-          <label>Quartos<input name="quartos" type="number" min="1" step="1" required></label>
-          <label>Suítes<input name="suites" type="number" min="0" step="1" required></label>
-          <label>Banheiros<input name="banheiros" type="number" min="0" step="1" required></label>
-          <label>Vagas<input name="vagas" type="number" min="0" step="1" required></label>
+          <label>Quartos<input name="quartos" type="number" min="1" step="1"></label>
+          <label>Suítes<input name="suites" type="number" min="0" step="1"></label>
+          <label>Banheiros<input name="banheiros" type="number" min="0" step="1"></label>
+          <label>Vagas<input name="vagas" type="number" min="0" step="1"></label>
           <label>Data de entrega<input name="data_entrega" type="date"></label>
           <label>Vídeo (URL)<input name="video_url" type="url" placeholder="https://..."></label>
           <label>Planta (URL)<input name="planta_url" type="url"></label>
           <label class="property-description">Descrição<textarea name="descricao" rows="4"></textarea></label>
           <label>Imagem de capa<input id="coverInput" type="file" accept="image/jpeg,image/png,image/webp,image/avif"><img id="coverPreview" class="upload-preview" alt="Pré-visualização da capa" hidden></label>
+          <div class="cover-actions" id="coverActions" hidden><button class="admin-secondary" id="removeCover" type="button">Remover imagem de capa</button></div>
+          <section class="cover-framing" id="coverFraming" aria-labelledby="coverFramingTitle" hidden>
+            <div><h3 id="coverFramingTitle">Enquadramento da capa</h3><p>Arraste a imagem para reposicioná-la. Ajuste cada visualização separadamente.</p></div>
+            <div class="cover-framing-grid">
+              <div class="cover-frame-editor">
+                <h4>Card do catálogo</h4>
+                <div class="cover-frame-preview cover-frame-card" data-cover-preview="card" tabindex="0" role="application" aria-label="Arraste ou use as setas do teclado para ajustar a capa no card"></div>
+                <label>Zoom <input type="range" min="0.7" max="2.5" step="0.01" data-cover-zoom="card"></label>
+                <button class="admin-secondary" type="button" data-frame-reset="card">Centralizar</button>
+              </div>
+              <div class="cover-frame-editor">
+                <h4>Página do imóvel</h4>
+                <div class="cover-frame-preview cover-frame-detail" data-cover-preview="detail" tabindex="0" role="application" aria-label="Arraste ou use as setas do teclado para ajustar a capa na página do imóvel"></div>
+                <label>Zoom <input type="range" min="0.7" max="2.5" step="0.01" data-cover-zoom="detail"></label>
+                <button class="admin-secondary" type="button" data-frame-reset="detail">Centralizar</button>
+              </div>
+            </div>
+          </section>
           <label>Galeria de imagens<input id="galleryInput" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple><div id="galleryPreview" class="gallery-preview"></div></label>
+          <section class="pdf-import" aria-labelledby="pdfImportTitle">
+            <div><h3 id="pdfImportTitle">Extrair páginas de PDF</h3><p>O PDF é processado neste navegador e não é armazenado. Selecione as páginas para adicionar à galeria.</p></div>
+            <label class="pdf-file-label">Selecionar PDF<input id="pdfInput" type="file" accept="application/pdf,.pdf"></label>
+            <p class="pdf-import-status" id="pdfImportStatus" role="status" aria-live="polite"></p>
+            <div class="pdf-page-grid" id="pdfPageGrid"></div>
+            <button class="admin-secondary" id="pdfLoadMore" type="button" hidden>Carregar mais páginas</button>
+            <button class="admin-secondary" id="pdfAddSelected" type="button" disabled>Adicionar páginas selecionadas</button>
+          </section>
           <label class="property-checkbox"><input name="destaque" type="checkbox"> Imóvel em destaque</label>
           <label>Status<select name="status" required><option value="rascunho">Rascunho</option><option value="publicado">Publicado</option></select></label>
         </div>

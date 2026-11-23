@@ -7,13 +7,19 @@
 3. Abra `supabase/schema.sql` neste projeto, copie o arquivo completo para a consulta e clique em **Run**.
 4. Confirme que a execução terminou sem erros antes de iniciar o site.
 
-O script cria as três tabelas, índices, triggers, políticas RLS e o bucket privado `imoveis`. Ele não cria imóveis de demonstração. O cadastro exige pelo menos um quarto e limita a entrega a até 36 meses, evitando studios e empreendimentos com previsão de três ou quatro anos. Os dados iniciais de contato são os que já estavam publicados no site e podem ser alterados em **Administração > Configurações**.
+O script cria as três tabelas, índices, triggers, políticas RLS e o bucket privado `imoveis`. Ele não cria imóveis de demonstração. A área continua obrigatória e a previsão de entrega, quando informada, fica limitada aos próximos 36 meses. Os dados iniciais de contato são os que já estavam publicados no site e podem ser alterados em **Administração > Configurações**.
+
+Para um projeto Supabase que já possui as tabelas, aplique `supabase/migrations/20261123_optional_property_fields_and_cover_framing.sql` pelo SQL Editor antes de publicar o frontend atualizado. A migração libera valores nulos nos campos opcionais e adiciona o enquadramento da capa com valores padrão compatíveis; ela não apaga registros nem altera políticas RLS. Em instalações novas, `schema.sql` já contém a estrutura atualizada.
 
 ## 2. Conferir o Storage
 
 No Supabase, acesse **Storage > Buckets > imoveis**. O bucket deve estar como **Private**. O SQL configura limite de 10 MiB e os tipos JPG, PNG, WebP e AVIF, além das políticas de leitura vinculada a imóveis publicados e escrita/exclusão exclusiva de administradores.
 
-Não habilite **Public bucket** nem crie políticas adicionais que permitam upload público. As colunas `imagem_capa` e `imagens_imoveis.url` guardam a URL autenticada do objeto; o site baixa a imagem pela API do Storage, sujeita à RLS.
+O PDF é lido localmente pelo navegador (limite de 50 MiB); somente páginas selecionadas, convertidas sequencialmente em JPEG de até 9 MiB cada, são enviadas ao bucket. Não é necessário criar bucket, política ou tipo MIME para PDF.
+
+As prévias usam URLs assinadas de curta duração e solicitam redimensionamento pelo Storage quando disponível. Se o plano do projeto não oferecer transformações, o site registra o motivo e usa a imagem original, sem alterar a privacidade do bucket.
+
+Não habilite **Public bucket** nem crie políticas adicionais que permitam upload público. As colunas `imagem_capa` e `imagens_imoveis.url` guardam a URL autenticada do objeto; a aplicação solicita URLs assinadas curtas pelo Storage, sujeitas à RLS no momento da assinatura.
 
 ## 3. Desabilitar cadastro público e criar o primeiro administrador
 
