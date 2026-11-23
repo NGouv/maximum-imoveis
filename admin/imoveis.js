@@ -774,7 +774,10 @@ async function saveGallery(propertyId, uploadedPaths) {
     gallery.push({ ...(item.id ? { id: item.id } : {}), imovel_id: propertyId, url: getStorageURL(path), ordem });
   }
   if (gallery.length) {
-    const { error } = await supabase.from("imagens_imoveis").upsert(gallery, { onConflict: "id" });
+    const { error } = await supabase.from("imagens_imoveis").upsert(gallery, {
+      onConflict: "id",
+      defaultToNull: false
+    });
     if (error) throw error;
   }
   const removed = existing.filter(image => !selectedIds.has(image.id));
