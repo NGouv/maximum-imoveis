@@ -3,11 +3,6 @@
   "trailingSlash": false,
   "redirects": [
     {
-      "source": "/admin",
-      "destination": "/admin/login.html",
-      "permanent": true
-    },
-    {
       "source": "/imovel.html",
       "has": [
         {
@@ -56,6 +51,12 @@
     {
       "source": "/contato",
       "destination": "/index.html"
+    }
+  ],
+  "routes": [
+    {
+      "src": "^/admin/?$",
+      "dest": "/admin/login.html"
     }
   ]
 }
