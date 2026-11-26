@@ -37,16 +37,18 @@ async function imageURL(path, transform = null) {
   return imageURLs.get(cacheKey);
 }
 
-function formattedPrice(price) {
-  return price === null || price === undefined || price === ""
-    ? "Consulte valores"
-    : Number(price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
 function formattedNumber(value) {
   if (value === null || value === undefined || value === "") return "";
   const number = Number(value);
   return Number.isFinite(number) ? number.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "";
+}
+
+function publicDescription(description) {
+  if (!description) return "";
+  return description.split(/\n\s*\n/).filter(paragraph =>
+    !/(?:R\$|US\$|€|£)\s*\d[\d.,]*/i.test(paragraph) &&
+    !/\b(?:valor|preço|preco|a partir de|investimento)\b.{0,30}\d[\d.,]*/i.test(paragraph)
+  ).join("\n\n").trim();
 }
 
 function formattedQuantity(value, singular, plural) {
@@ -121,7 +123,7 @@ function cardTemplate(property) {
         <h3>${escapeHTML(propertyName)}</h3>
         <p class="card-location">${escapeHTML(propertyLocation(property))}</p>
         ${specs.length ? `<div class="card-specs">${specs.map(spec => `<span>${escapeHTML(spec)}</span>`).join("")}</div>` : ""}
-        <div class="card-price"><strong>${formattedPrice(property.preco)}</strong></div>
+        <div class="card-value-prompt"><strong>Consulte valores</strong></div>
         <a class="card-cta" href="/imovel/${encodeURIComponent(property.slug)}" data-open-property="${slug}">Conhecer imóvel <span aria-hidden="true">→</span></a>
       </div>
     </div>
@@ -263,7 +265,7 @@ async function loadCatalog() {
   }
   const [{ data, error }, { data: settings, error: settingsError }] = await Promise.all([
     supabase.from("imoveis")
-      .select("id, titulo, slug, nome_empreendimento, descricao, regiao, bairro, cidade, estado, area_m2, quartos, suites, banheiros, vagas, preco, padrao, categoria, destaque, imagem_capa, enquadramento_capa, construtora, endereco, data_entrega, video_url, planta_url, status, imagens_imoveis(url, ordem)")
+      .select("id, titulo, slug, nome_empreendimento, descricao, regiao, bairro, cidade, estado, area_m2, quartos, suites, banheiros, vagas, padrao, categoria, destaque, imagem_capa, enquadramento_capa, construtora, endereco, data_entrega, video_url, planta_url, status, imagens_imoveis(url, ordem)")
       .eq("status", "publicado")
       .order("created_at", { ascending: false })
       .order("ordem", { ascending: true, referencedTable: "imagens_imoveis" })
@@ -410,8 +412,8 @@ async function openProperty(slug, updateHistory = true) {
     }
   }));
   const visiblePhotos = photos.filter(Boolean);
-  const message = `Olá! Gostaria de agendar uma visita ao imóvel ${propertyName}.`;
-  const description = property.descricao?.trim();
+  const message = `Olá! Gostaria de consultar valores e obter mais informações sobre o imóvel ${propertyName}.`;
+  const description = publicDescription(property.descricao);
   const companyName = institutionalSettings?.nome || "Maximum Imóveis";
   const deliveryDate = property.data_entrega
     ? new Date(`${property.data_entrega}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -458,12 +460,12 @@ async function openProperty(slug, updateHistory = true) {
           ${video || plan ? `<section class="detail-section"><p class="eyebrow">Materiais do empreendimento</p><h2>Vídeo e planta</h2>${video}${plan}</section>` : ""}
         </main>
         <aside class="detail-aside">
-          <p class="eyebrow">Atendimento Maximum</p><h2>${formattedPrice(property.preco)}</h2>
+          <p class="eyebrow">Atendimento Maximum</p><h2>Consulte valores</h2>
           <p class="aside-location">${escapeHTML(property.bairro)} · ${escapeHTML(property.regiao)}</p>
           <div class="aside-specs">${property.area_m2 !== null && property.area_m2 !== undefined && property.area_m2 !== "" ? `<span>${formattedNumber(property.area_m2)} m²</span>` : ""}${property.quartos !== null && property.quartos !== undefined ? `<span>${formattedQuantity(property.quartos, "quarto", "quartos")}</span>` : ""}${property.suites !== null && property.suites !== undefined ? `<span>${formattedQuantity(property.suites, "suíte", "suítes")}</span>` : ""}</div>
-          <a class="button button-gold" href="${escapeHTML(visitLink)}" ${whatsappAvailable ? 'target="_blank" rel="noopener"' : ""}>Agendar visita</a>
+          <a class="button button-gold" href="${escapeHTML(visitLink)}" ${whatsappAvailable ? 'target="_blank" rel="noopener"' : ""}>Solicitar informações</a>
           ${institutionalSettings?.telefone ? `<a class="aside-phone" href="tel:${escapeHTML(institutionalSettings.telefone.replace(/[^\d+]/g, ""))}">${escapeHTML(institutionalSettings.telefone)}</a>` : ""}
-          <p class="simulation-note">Valores e disponibilidade devem ser confirmados com a Maximum Imóveis.</p>
+          <p class="simulation-note">Fale com a Maximum para consultar valores e disponibilidade.</p>
         </aside>
       </div>
       ${similar}

@@ -63,9 +63,8 @@ h1,h2,h3 { font-family:"Cormorant Garamond",serif; }
 .card-specs { display:flex; gap:10px; margin:0 0 12px; font-size:11px; }
 .card-specs span { padding-right:10px; border-right:1px solid rgba(255,255,255,.25); }
 .card-specs span:last-child { border:0; }
-.card-price { display:flex; justify-content:space-between; align-items:end; border-top:1px solid rgba(255,255,255,.18); padding-top:10px; }
-.card-price strong { color:var(--gold); font-family:"Cormorant Garamond",serif; font-size:18px; font-weight:500; }
-.card-price span { font-size:9px; text-transform:uppercase; letter-spacing:.08em; }
+.card-value-prompt { display:flex; justify-content:space-between; align-items:end; border-top:1px solid rgba(255,255,255,.18); padding-top:10px; }
+.card-value-prompt strong { color:var(--gold); font-family:"Cormorant Garamond",serif; font-size:18px; font-weight:500; }
 .about { position:relative; height:680px; color:white; overflow:hidden; }
 .about-backdrop,.about-backdrop picture,.about-backdrop img { position:absolute; inset:0; width:100%; height:100%; }
 .about-backdrop img { object-fit:cover; }
@@ -206,8 +205,8 @@ body { overflow-x:clip; background:var(--cream); }
 .card-standard { margin:0 0 8px; color:#e4c995; font-size:9px; text-transform:uppercase; letter-spacing:.15em; }
 .card-specs { flex-wrap:wrap; gap:7px 10px; color:rgba(255,255,255,.86); }
 .card-specs span { padding-right:10px; }
-.card-price { align-items:center; min-height:40px; }
-.card-price strong { font-size:20px; }
+.card-value-prompt { align-items:center; min-height:40px; }
+.card-value-prompt strong { font-size:20px; }
 .card-cta { min-height:42px; margin-top:12px; display:flex; align-items:center; justify-content:space-between; color:#f2e7d0; border-top:1px solid rgba(255,255,255,.18); font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
 .card-cta span { color:var(--gold); font-size:17px; transition:transform .25s ease; }
 .card-cta:hover span { transform:translateX(4px); }
